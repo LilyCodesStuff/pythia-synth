@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Pythia Vocal Synth</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -61,14 +62,23 @@ canvas.select-mode{cursor:default;}
 .pill{font-size:11px;padding:3px 8px;background:#3a3a3a;border:1px solid #555;color:#ccc;}
 .save-vb-btn{width:100%;padding:12px;background-color:#28a745;border:1px solid #28a745;color:#EEE;font-size:14px;font-weight:bold;cursor:pointer;font-family:Arial,sans-serif;}
 .save-vb-btn:disabled{opacity:0.4;cursor:not-allowed;background-color:#555;border-color:#777;}
+.saved-vbs{margin-top:4px;}
+.saved-vb-item{display:flex;align-items:center;gap:4px;margin-bottom:4px;}
+.saved-vb-item button{margin:0;font-size:11px;padding:5px;}
+.saved-vb-item .del-btn{width:auto;background:#8b0000;border-color:#cc0000;padding:5px 8px;}
+.status-bar{font-size:10px;color:#888;margin-top:4px;min-height:14px;}
 </style>
 </head>
 <body>
+
 <div id="mainScreen" class="screen active">
   <div class="sidebar">
     <h3>VOICEBANK</h3>
     <div class="vb-label" id="vbName">Current: None</div>
-    <label for="vbFile" class="file-label">Load Voicebank</label>
+    <div class="status-bar" id="statusBar">Loading saved data...</div>
+    <h4 style="font-size:11px;color:#aaa;margin-bottom:4px;">Saved Voicebanks:</h4>
+    <div class="saved-vbs" id="savedVBList"></div>
+    <label for="vbFile" class="file-label">Load .PYAI File</label>
     <input type="file" id="vbFile" accept=".pyai,.PYAI,.json">
     <label for="samplesDir" class="file-label">Load Samples Folder</label>
     <input type="file" id="samplesDir" webkitdirectory multiple>
@@ -148,124 +158,138 @@ canvas.select-mode{cursor:default;}
 
 <script>
 // ── PHONEME LISTS ──────────────────────────────────
-const JP_PH = [
-  ["a","あ",""],["i","い",""],["u","う",""],["e","え",""],["o","お",""],
-  ["ka","か",""],["ki","き",""],["ku","く",""],["ke","け",""],["ko","こ",""],
-  ["sa","さ",""],["shi","し",""],["su","す",""],["se","せ",""],["so","そ",""],
-  ["ta","た",""],["chi","ち",""],["tsu","つ",""],["te","て",""],["to","と",""],
-  ["na","な",""],["ni","に",""],["nu","ぬ",""],["ne","ね",""],["no","の",""],
-  ["ha","は",""],["hi","ひ",""],["fu","ふ",""],["he","へ",""],["ho","ほ",""],
-  ["ma","ま",""],["mi","み",""],["mu","む",""],["me","め",""],["mo","も",""],
-  ["ya","や",""],["yu","ゆ",""],["yo","よ",""],
-  ["ra","ら",""],["ri","り",""],["ru","る",""],["re","れ",""],["ro","ろ",""],
-  ["wa","わ",""],["wo","を",""],["n","ん",""],
-  ["ga","が",""],["gi","ぎ",""],["gu","ぐ",""],["ge","げ",""],["go","ご",""],
-  ["za","ざ",""],["ji","じ",""],["zu","ず",""],["ze","ぜ",""],["zo","ぞ",""],
-  ["da","だ",""],["de","で",""],["do","ど",""],
-  ["ba","ば",""],["bi","び",""],["bu","ぶ",""],["be","べ",""],["bo","ぼ",""],
-  ["pa","ぱ",""],["pi","ぴ",""],["pu","ぷ",""],["pe","ぺ",""],["po","ぽ",""],
-];
+const JP_PH=[["a","あ",""],["i","い",""],["u","う",""],["e","え",""],["o","お",""],["ka","か",""],["ki","き",""],["ku","く",""],["ke","け",""],["ko","こ",""],["sa","さ",""],["shi","し",""],["su","す",""],["se","せ",""],["so","そ",""],["ta","た",""],["chi","ち",""],["tsu","つ",""],["te","て",""],["to","と",""],["na","な",""],["ni","に",""],["nu","ぬ",""],["ne","ね",""],["no","の",""],["ha","は",""],["hi","ひ",""],["fu","ふ",""],["he","へ",""],["ho","ほ",""],["ma","ま",""],["mi","み",""],["mu","む",""],["me","め",""],["mo","も",""],["ya","や",""],["yu","ゆ",""],["yo","よ",""],["ra","ら",""],["ri","り",""],["ru","る",""],["re","れ",""],["ro","ろ",""],["wa","わ",""],["wo","を",""],["n","ん",""],["ga","が",""],["gi","ぎ",""],["gu","ぐ",""],["ge","げ",""],["go","ご",""],["za","ざ",""],["ji","じ",""],["zu","ず",""],["ze","ぜ",""],["zo","ぞ",""],["da","だ",""],["de","で",""],["do","ど",""],["ba","ば",""],["bi","び",""],["bu","ぶ",""],["be","べ",""],["bo","ぼ",""],["pa","ぱ",""],["pi","ぴ",""],["pu","ぷ",""],["pe","ぺ",""],["po","ぽ",""]];
+const EN_PH=[["AA","Vowel","f-AA-ther"],["AE","Vowel","c-AE-t"],["AH","Vowel","b-UH-t"],["AO","Vowel","t-AW-k"],["AW","Vowel","c-OW"],["AY","Vowel","fl-Y"],["EH","Vowel","b-E-d"],["ER","Vowel","b-IR-d"],["EY","Vowel","f-AY-ce"],["IH","Vowel","s-I-t"],["IY","Vowel","s-EE"],["OW","Vowel","g-O"],["OY","Vowel","b-OY"],["UH","Vowel","b-OO-k"],["UW","Vowel","f-OO-d"],["B","Stop","B-at"],["CH","Affricate","CH-in"],["D","Stop","D-ig"],["DH","Fricative","TH-is"],["F","Fricative","F-at"],["G","Stop","G-o"],["HH","Aspirate","H-at"],["JH","Affricate","J-oy"],["K","Stop","K-ey"],["L","Liquid","L-et"],["M","Nasal","M-at"],["N","Nasal","N-ot"],["NG","Nasal","si-NG"],["P","Stop","P-at"],["R","Liquid","R-at"],["S","Fricative","S-at"],["SH","Fricative","SH-e"],["T","Stop","T-op"],["TH","Fricative","TH-in"],["V","Fricative","V-at"],["W","Semivowel","W-et"],["Y","Semivowel","Y-et"],["Z","Fricative","Z-ap"],["ZH","Fricative","mea-SU-re"]];
+const EN_G2P={"the":["DH","AH"],"a":["AH"],"an":["AE","N"],"and":["AE","N","D"],"to":["T","UW"],"of":["AH","V"],"in":["IH","N"],"is":["IH","Z"],"it":["IH","T"],"you":["Y","UW"],"he":["HH","IY"],"she":["SH","IY"],"we":["W","IY"],"they":["DH","EY"],"i":["AY"],"be":["B","IY"],"are":["AA","R"],"was":["W","AH","Z"],"have":["HH","AE","V"],"do":["D","UW"],"can":["K","AE","N"],"will":["W","IH","L"],"my":["M","AY"],"not":["N","AA","T"],"but":["B","AH","T"],"hello":["HH","EH","L","OW"],"world":["W","ER","L","D"],"love":["L","AH","V"],"sing":["S","IH","NG"],"song":["S","AO","NG"],"voice":["V","OY","S"],"music":["M","Y","UW","Z","IH","K"],"dream":["D","R","IY","M"],"heart":["HH","AA","R","T"]};
+const LMAP={'a':'AH','b':'B','c':'K','d':'D','e':'EH','f':'F','g':'G','h':'HH','i':'IH','j':'JH','k':'K','l':'L','m':'M','n':'N','o':'OW','p':'P','q':'K','r':'R','s':'S','t':'T','u':'AH','v':'V','w':'W','x':'K','y':'Y','z':'Z'};
+function g2p(w){w=w.toLowerCase().trim();if(EN_G2P[w])return EN_G2P[w];return[...w].map(c=>LMAP[c]||'AH');}
 
-// ARPAbet phonemes with example words (no CMUdict!)
-const EN_PH = [
-  ["AA","Vowel","f-AA-ther"],["AE","Vowel","c-AE-t"],["AH","Vowel","b-UH-t"],
-  ["AO","Vowel","t-AW-k"],["AW","Vowel","c-OW"],["AY","Vowel","fl-Y"],
-  ["EH","Vowel","b-E-d"],["ER","Vowel","b-IR-d"],["EY","Vowel","f-AY-ce"],
-  ["IH","Vowel","s-I-t"],["IY","Vowel","s-EE"],["OW","Vowel","g-O"],
-  ["OY","Vowel","b-OY"],["UH","Vowel","b-OO-k"],["UW","Vowel","f-OO-d"],
-  ["B","Stop","B-at"],["CH","Affricate","CH-in"],["D","Stop","D-ig"],
-  ["DH","Fricative","TH-is"],["F","Fricative","F-at"],["G","Stop","G-o"],
-  ["HH","Aspirate","H-at"],["JH","Affricate","J-oy"],["K","Stop","K-ey"],
-  ["L","Liquid","L-et"],["M","Nasal","M-at"],["N","Nasal","N-ot"],
-  ["NG","Nasal","si-NG"],["P","Stop","P-at"],["R","Liquid","R-at"],
-  ["S","Fricative","S-at"],["SH","Fricative","SH-e"],["T","Stop","T-op"],
-  ["TH","Fricative","TH-in"],["V","Fricative","V-at"],["W","Semivowel","W-et"],
-  ["Y","Semivowel","Y-et"],["Z","Fricative","Z-ap"],["ZH","Fricative","mea-SU-re"],
-];
+// ── INDEXEDDB ─────────────────────────────────────
+const DB_NAME='PythiaSynth',DB_VER=1;
+let db=null;
 
-// Simple English G2P rules (no external libs)
-const EN_G2P = {
-  // Common words
-  "the":["DH","AH"],"a":["AH"],"an":["AE","N"],"and":["AE","N","D"],
-  "to":["T","UW"],"of":["AH","V"],"in":["IH","N"],"is":["IH","Z"],
-  "it":["IH","T"],"you":["Y","UW"],"he":["HH","IY"],"she":["SH","IY"],
-  "we":["W","IY"],"they":["DH","EY"],"i":["AY"],
-  "be":["B","IY"],"been":["B","IH","N"],"are":["AA","R"],"was":["W","AH","Z"],
-  "have":["HH","AE","V"],"has":["HH","AE","Z"],"had":["HH","AE","D"],
-  "do":["D","UW"],"does":["D","AH","Z"],"did":["D","IH","D"],
-  "can":["K","AE","N"],"will":["W","IH","L"],"would":["W","UH","D"],
-  "my":["M","AY"],"your":["Y","AO","R"],"his":["HH","IH","Z"],
-  "her":["HH","ER"],"our":["AW","R"],"their":["DH","EH","R"],
-  "this":["DH","IH","S"],"that":["DH","AE","T"],"with":["W","IH","DH"],
-  "for":["F","AO","R"],"on":["AO","N"],"at":["AE","T"],
-  "not":["N","AA","T"],"but":["B","AH","T"],"or":["AO","R"],
-  "from":["F","R","AH","M"],"by":["B","AY"],"so":["S","OW"],
-  "up":["AH","P"],"out":["AW","T"],"if":["IH","F"],
-  "about":["AH","B","AW","T"],"what":["W","AH","T"],"all":["AO","L"],
-  "were":["W","ER"],"when":["W","EH","N"],"how":["HH","AW"],
-  "hello":["HH","EH","L","OW"],"world":["W","ER","L","D"],
-  "love":["L","AH","V"],"sing":["S","IH","NG"],"song":["S","AO","NG"],
-  "voice":["V","OY","S"],"music":["M","Y","UW","Z","IH","K"],
-  "dream":["D","R","IY","M"],"heart":["HH","AA","R","T"],
-};
+function openDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(DB_NAME,DB_VER);
+    req.onupgradeneeded=e=>{
+      const d=e.target.result;
+      if(!d.objectStoreNames.contains('voicebanks'))d.createObjectStore('voicebanks',{keyPath:'name'});
+      if(!d.objectStoreNames.contains('samples'))d.createObjectStore('samples');
+    };
+    req.onsuccess=e=>{db=e.target.result;res(db);};
+    req.onerror=e=>rej(e);
+  });
+}
 
-// Fallback letter->phoneme map
-const LETTER_PH = {
-  'a':'AH','b':'B','c':'K','d':'D','e':'EH','f':'F','g':'G','h':'HH',
-  'i':'IH','j':'JH','k':'K','l':'L','m':'M','n':'N','o':'OW','p':'P',
-  'q':'K','r':'R','s':'S','t':'T','u':'AH','v':'V','w':'W','x':'K',
-  'y':'Y','z':'Z'
-};
+async function dbSaveVB(name,meta,samplesMap){
+  // meta = parsed PYAI json, samplesMap = {filename: ArrayBuffer}
+  return new Promise((res,rej)=>{
+    const tx=db.transaction(['voicebanks','samples'],'readwrite');
+    tx.objectStore('voicebanks').put({name,meta});
+    for(const[fn,buf] of Object.entries(samplesMap)){
+      tx.objectStore('samples').put(buf,name+'::'+fn);
+    }
+    tx.oncomplete=()=>res();
+    tx.onerror=e=>rej(e);
+  });
+}
 
-function g2p(word) {
-  word = word.toLowerCase().trim();
-  if(EN_G2P[word]) return EN_G2P[word];
-  // Letter by letter fallback
-  return [...word].map(c => LETTER_PH[c] || 'AH');
+async function dbLoadVB(name){
+  return new Promise((res,rej)=>{
+    const tx=db.transaction(['voicebanks','samples'],'readonly');
+    const metaReq=tx.objectStore('voicebanks').get(name);
+    metaReq.onsuccess=async e=>{
+      const row=e.target.result;if(!row){res(null);return;}
+      const samplesMap={};
+      const keys=Object.values(row.meta.samples||{});
+      let done=0;
+      if(keys.length===0){res({meta:row.meta,samplesMap});return;}
+      for(const fn of keys){
+        const req2=tx.objectStore('samples').get(name+'::'+fn);
+        req2.onsuccess=ev=>{
+          if(ev.target.result)samplesMap[fn]=ev.target.result;
+          done++;if(done===keys.length)res({meta:row.meta,samplesMap});
+        };
+        req2.onerror=()=>{done++;if(done===keys.length)res({meta:row.meta,samplesMap});};
+      }
+    };
+    metaReq.onerror=e=>rej(e);
+  });
+}
+
+async function dbListVBs(){
+  return new Promise((res,rej)=>{
+    const tx=db.transaction('voicebanks','readonly');
+    const req=tx.objectStore('voicebanks').getAllKeys();
+    req.onsuccess=e=>res(e.target.result);
+    req.onerror=e=>rej(e);
+  });
+}
+
+async function dbDeleteVB(name){
+  return new Promise((res,rej)=>{
+    const tx=db.transaction(['voicebanks','samples'],'readwrite');
+    tx.objectStore('voicebanks').delete(name);
+    // Delete all sample keys for this VB
+    const sStore=tx.objectStore('samples');
+    const req=sStore.getAllKeys();
+    req.onsuccess=e=>{
+      for(const k of e.target.result)if(k.startsWith(name+'::'))sStore.delete(k);
+    };
+    tx.oncomplete=()=>res();
+    tx.onerror=e=>rej(e);
+  });
+}
+
+function setStatus(msg){document.getElementById('statusBar').textContent=msg;}
+
+async function refreshVBList(){
+  const list=await dbListVBs();
+  const el=document.getElementById('savedVBList');
+  el.innerHTML='';
+  if(list.length===0){el.innerHTML='<div style="font-size:11px;color:#666;">None saved yet</div>';return;}
+  for(const name of list){
+    const row=document.createElement('div');row.className='saved-vb-item';
+    const loadBtn=document.createElement('button');
+    loadBtn.textContent=name;loadBtn.style.flex='1';loadBtn.style.fontSize='11px';loadBtn.style.padding='5px';
+    loadBtn.onclick=()=>loadSavedVB(name);
+    const delBtn=document.createElement('button');
+    delBtn.textContent='X';delBtn.className='del-btn';
+    delBtn.onclick=async()=>{if(confirm('Delete "'+name+'"?')){await dbDeleteVB(name);await refreshVBList();}};
+    row.appendChild(loadBtn);row.appendChild(delBtn);
+    el.appendChild(row);
+  }
+}
+
+async function loadSavedVB(name){
+  setStatus('Loading '+name+'...');
+  const data=await dbLoadVB(name);
+  if(!data){setStatus('Not found!');return;}
+  S.vb=data.meta;
+  S.audioFiles=data.samplesMap;
+  document.getElementById('vbName').textContent='Current: '+name+' ('+(S.vb.language||'JP')+')';
+  setStatus('Loaded: '+Object.keys(S.audioFiles).length+' samples');
 }
 
 // ── STATE ──────────────────────────────────────────
-const S = {
-  GX:40,GY:20,CW:4800,CH:1760,
-  notes:[],selected:new Set(),
-  mode:'draw',tempo:120,
-  vb:null,audioFiles:{},
-  audioCtx:null,
-  playTimer:null,playIdx:0,playNotes:[],
-  showHead:false,playheadX:0,
-  pendingNote:null,
-  dragging:null,resizing:null,dragOff:{x:0,y:0},
-  phIdx:0,recordings:{},recording:false,
-  mediaRecorder:null,recChunks:[],
-  vbLang:'JP',
-};
+const S={GX:40,GY:20,CW:4800,CH:1760,notes:[],selected:new Set(),mode:'draw',tempo:120,vb:null,audioFiles:{},audioCtx:null,playTimer:null,playIdx:0,playNotes:[],showHead:false,playheadX:0,pendingNote:null,dragging:null,resizing:null,dragOff:{x:0,y:0},phIdx:0,recordings:{},recording:false,mediaRecorder:null,recChunks:[],vbLang:'JP'};
+function currentPhonemes(){return S.vbLang==='JP'?JP_PH:EN_PH;}
 
-function currentPhonemes() { return S.vbLang==='JP' ? JP_PH : EN_PH; }
-
-// ── SCREEN ─────────────────────────────────────────
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');if(id==='vbScreen')initVBMaker();}
 
 // ── CANVAS ─────────────────────────────────────────
 const canvas=document.getElementById('roll'),ctx=canvas.getContext('2d');
 canvas.width=S.CW;canvas.height=S.CH;
-
 function drawAll(){
   ctx.fillStyle='#1e1e1e';ctx.fillRect(0,0,S.CW,S.CH);
   ctx.strokeStyle='#323232';ctx.lineWidth=1;
   for(let y=0;y<=S.CH;y+=S.GY){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(S.CW,y);ctx.stroke();}
   for(let x=0;x<=S.CW;x+=S.GX){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,S.CH);ctx.stroke();}
-  S.notes.forEach(n=>{
-    const sel=S.selected.has(n);
-    ctx.fillStyle='rgba(100,100,255,0.8)';ctx.fillRect(n.x,n.y,n.w,n.h);
-    ctx.strokeStyle=sel?'yellow':'#000';ctx.lineWidth=sel?2:1;ctx.strokeRect(n.x,n.y,n.w,n.h);
-    ctx.fillStyle='white';ctx.font='12px Arial';ctx.fillText(n.lyric,n.x+4,n.y+14);
-    ctx.fillStyle='rgba(255,255,255,0.25)';ctx.fillRect(n.x+n.w-6,n.y+2,4,n.h-4);
-  });
+  S.notes.forEach(n=>{const sel=S.selected.has(n);ctx.fillStyle='rgba(100,100,255,0.8)';ctx.fillRect(n.x,n.y,n.w,n.h);ctx.strokeStyle=sel?'yellow':'#000';ctx.lineWidth=sel?2:1;ctx.strokeRect(n.x,n.y,n.w,n.h);ctx.fillStyle='white';ctx.font='12px Arial';ctx.fillText(n.lyric,n.x+4,n.y+14);ctx.fillStyle='rgba(255,255,255,0.25)';ctx.fillRect(n.x+n.w-6,n.y+2,4,n.h-4);});
   if(S.showHead){ctx.strokeStyle='red';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(S.playheadX,0);ctx.lineTo(S.playheadX,S.CH);ctx.stroke();}
 }
 drawAll();
 
-// ── INPUT ──────────────────────────────────────────
 function getPos(e){const wrap=document.getElementById('rollWrap'),rect=canvas.getBoundingClientRect(),t=e.touches?e.touches[0]:e;return{x:t.clientX-rect.left+wrap.scrollLeft,y:t.clientY-rect.top+wrap.scrollTop};}
 function snap(v,g){return Math.round(v/g)*g;}
 function y2midi(y){return 88-Math.floor(y/S.GY);}
@@ -275,194 +299,19 @@ canvas.addEventListener('touchstart',onDown,{passive:false});canvas.addEventList
 canvas.addEventListener('touchmove',onMove,{passive:false});canvas.addEventListener('mousemove',onMove);
 canvas.addEventListener('touchend',onUp);canvas.addEventListener('mouseup',onUp);
 
-function onDown(e){
-  e.preventDefault();const p=getPos(e);
-  if(S.mode==='draw'){S.pendingNote={x:snap(p.x,S.GX),y:snap(p.y,S.GY)};return;}
-  for(let i=S.notes.length-1;i>=0;i--){
-    const n=S.notes[i];
-    if(p.x>=n.x&&p.x<=n.x+n.w&&p.y>=n.y&&p.y<=n.y+n.h){
-      if(p.x>n.x+n.w-14){S.resizing=n;S.dragOff.x=p.x-(n.x+n.w);return;}
-      if(!S.selected.has(n)){S.selected.clear();S.selected.add(n);}
-      S.dragging=n;S.dragOff={x:p.x-n.x,y:p.y-n.y};drawAll();return;
-    }
-  }
-  S.selected.clear();drawAll();
-}
-function onMove(e){
-  e.preventDefault();const p=getPos(e);
-  if(S.resizing){S.resizing.w=Math.max(S.GX,snap(p.x-S.resizing.x-S.dragOff.x,S.GX));drawAll();return;}
-  if(S.dragging){S.dragging.x=Math.max(0,snap(p.x-S.dragOff.x,S.GX));S.dragging.y=Math.max(0,Math.min(snap(p.y-S.dragOff.y,S.GY),S.CH-S.GY));S.dragging.pitch=y2midi(S.dragging.y);drawAll();}
-}
-function onUp(e){
-  if(S.resizing){S.resizing=null;return;}
-  if(S.dragging){S.dragging=null;return;}
-  if(S.pendingNote&&S.mode==='draw'){const pn=S.pendingNote;S.pendingNote=null;openModal(pn.x,pn.y);}
-}
+function onDown(e){e.preventDefault();const p=getPos(e);if(S.mode==='draw'){S.pendingNote={x:snap(p.x,S.GX),y:snap(p.y,S.GY)};return;}for(let i=S.notes.length-1;i>=0;i--){const n=S.notes[i];if(p.x>=n.x&&p.x<=n.x+n.w&&p.y>=n.y&&p.y<=n.y+n.h){if(p.x>n.x+n.w-14){S.resizing=n;S.dragOff.x=p.x-(n.x+n.w);return;}if(!S.selected.has(n)){S.selected.clear();S.selected.add(n);}S.dragging=n;S.dragOff={x:p.x-n.x,y:p.y-n.y};drawAll();return;}}S.selected.clear();drawAll();}
+function onMove(e){e.preventDefault();const p=getPos(e);if(S.resizing){S.resizing.w=Math.max(S.GX,snap(p.x-S.resizing.x-S.dragOff.x,S.GX));drawAll();return;}if(S.dragging){S.dragging.x=Math.max(0,snap(p.x-S.dragOff.x,S.GX));S.dragging.y=Math.max(0,Math.min(snap(p.y-S.dragOff.y,S.GY),S.CH-S.GY));S.dragging.pitch=y2midi(S.dragging.y);drawAll();}}
+function onUp(e){if(S.resizing){S.resizing=null;return;}if(S.dragging){S.dragging=null;return;}if(S.pendingNote&&S.mode==='draw'){const pn=S.pendingNote;S.pendingNote=null;openModal(pn.x,pn.y);}}
 
-// ── MODAL ──────────────────────────────────────────
 let _px,_py;
 function openModal(x,y){_px=x;_py=y;document.getElementById('lyricModal').classList.add('open');const i=document.getElementById('lyricInput');i.value='a';setTimeout(()=>{i.focus();i.select();},100);}
 function closeModal(){document.getElementById('lyricModal').classList.remove('open');}
 function confirmNote(){const l=document.getElementById('lyricInput').value.trim()||'a';S.notes.push({x:_px,y:_py,w:S.GX,h:S.GY,lyric:l,pitch:y2midi(_py)});drawAll();closeModal();}
 document.getElementById('lyricInput').addEventListener('keydown',e=>{if(e.key==='Enter')confirmNote();if(e.key==='Escape')closeModal();});
 
-// ── TOOLS ──────────────────────────────────────────
 function setMode(m){S.mode=m;document.getElementById('btnDraw').classList.toggle('active',m==='draw');document.getElementById('btnSel').classList.toggle('active',m==='select');canvas.classList.toggle('select-mode',m==='select');}
 function deleteSelected(){S.notes=S.notes.filter(n=>!S.selected.has(n));S.selected.clear();drawAll();}
 function clearAll(){if(confirm('Clear all notes?')){S.notes=[];S.selected.clear();drawAll();}}
 function setBpm(v){S.tempo=parseInt(v);document.getElementById('bpmVal').textContent=v;}
 
-// ── VOICEBANK LOADING ──────────────────────────────
-document.getElementById('vbFile').addEventListener('change',async e=>{
-  const f=e.target.files[0];if(!f)return;
-  try{S.vb=JSON.parse(await f.text());document.getElementById('vbName').textContent='Current: '+(S.vb.name||'Unknown')+' ('+(S.vb.language||'JP')+')';}
-  catch(err){alert('Failed to load voicebank: '+err.message);}
-});
-document.getElementById('samplesDir').addEventListener('change',async e=>{
-  S.audioFiles={};for(const f of e.target.files)if(f.name.endsWith('.wav'))S.audioFiles[f.name]=await f.arrayBuffer();
-  alert('Loaded '+Object.keys(S.audioFiles).length+' WAV samples!');
-});
-document.getElementById('projFile').addEventListener('change',async e=>{
-  const f=e.target.files[0];if(!f)return;
-  try{const d=JSON.parse(await f.text());S.notes=d.map(n=>({x:n.x,y:n.y,w:n.width||n.w||S.GX,h:S.GY,lyric:n.lyric,pitch:n.pitch}));S.selected.clear();drawAll();}
-  catch(err){alert('Failed: '+err.message);}
-});
-
-// ── AUDIO ──────────────────────────────────────────
-function getAC(){if(!S.audioCtx)S.audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(S.audioCtx.state==='suspended')S.audioCtx.resume();return S.audioCtx;}
-async function playSample(key,rate=1){
-  if(!S.vb||!S.vb.samples)return;const fn=S.vb.samples[key];if(!fn)return;const buf=S.audioFiles[fn];if(!buf)return;
-  try{const ac=getAC(),ab=await ac.decodeAudioData(buf.slice(0)),src=ac.createBufferSource();src.buffer=ab;src.playbackRate.value=rate;src.connect(ac.destination);src.start(0);}
-  catch(e){console.warn(e);}
-}
-
-function getPhonemes(lyric){
-  if(!S.vb)return[lyric];
-  const lang=(S.vb.language||'JP').toUpperCase();
-  const lo=lyric.toLowerCase().trim();
-  if(lang==='EN'){
-    const phs=g2p(lo);
-    // check which ones we actually have samples for
-    return phs.filter(p=>S.vb.samples&&S.vb.samples[p]).length>0
-      ? phs.filter(p=>S.vb.samples&&S.vb.samples[p])
-      : S.vb.samples&&S.vb.samples[lo]?[lo]:phs;
-  }
-  return S.vb.samples&&S.vb.samples[lo]?[lo]:[lo];
-}
-
-// ── PLAYBACK ───────────────────────────────────────
-function playSeq(){
-  if(!S.vb){alert('Please load a voicebank first!');return;}
-  if(S.playTimer)clearTimeout(S.playTimer);
-  S.playNotes=[...S.notes].sort((a,b)=>a.x-b.x);
-  if(!S.playNotes.length){alert('No notes to play!');return;}
-  S.playIdx=0;S.showHead=true;_next();
-}
-function _next(){
-  if(S.playIdx>=S.playNotes.length){resetHead();return;}
-  const n=S.playNotes[S.playIdx];S.playheadX=n.x;drawAll();
-  document.getElementById('rollWrap').scrollLeft=Math.max(0,n.x-150);
-  const rate=midi2rate(n.pitch),base=(60000/S.tempo)/4;
-  const phs=getPhonemes(n.lyric);
-  phs.forEach((p,i)=>setTimeout(()=>playSample(p,rate),i*base));
-  const dur=(60000/S.tempo)*(n.w/S.GX);S.playIdx++;S.playTimer=setTimeout(_next,dur);
-}
-function pauseSeq(){if(S.playTimer){clearTimeout(S.playTimer);S.playTimer=null;}}
-function resetHead(){pauseSeq();S.playIdx=0;S.showHead=false;S.playheadX=0;drawAll();}
-
-// ── SAVE / EXPORT ──────────────────────────────────
-function saveProject(){const d=S.notes.map(n=>({x:n.x,y:n.y,width:n.w,pitch:n.pitch,lyric:n.lyric})),b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='pythia_project.json';a.click();}
-
-async function exportWav(){
-  if(!S.vb){alert('Please load a voicebank first!');return;}
-  const ns=[...S.notes].sort((a,b)=>a.x-b.x);if(!ns.length){alert('No notes!');return;}
-  const ac=getAC(),sr=44100,last=ns[ns.length-1];
-  const td=((last.x+last.w)/S.GX*60)/S.tempo,ts=Math.ceil(td*sr),out=new Float32Array(ts*2);
-  for(const n of ns){
-    const st=(n.x/S.GX*60)/S.tempo,rate=midi2rate(n.pitch),phs=getPhonemes(n.lyric);
-    for(let i=0;i<phs.length;i++){
-      const fn=S.vb.samples[phs[i]];if(!fn)continue;const raw=S.audioFiles[fn];if(!raw)continue;
-      try{const ab=await ac.decodeAudioData(raw.slice(0)),c0=ab.getChannelData(0),c1=ab.numberOfChannels>1?ab.getChannelData(1):c0,ps=Math.floor((st+i*0.25*60/S.tempo)*sr);for(let s=0;s<c0.length&&ps+s<ts;s++){out[(ps+s)*2]+=c0[s];out[(ps+s)*2+1]+=c1[s];}}catch(e){console.warn(e);}
-    }
-  }
-  let mx=0;for(let i=0;i<out.length;i++)mx=Math.max(mx,Math.abs(out[i]));if(mx>0)for(let i=0;i<out.length;i++)out[i]=out[i]/mx*0.9;
-  const buf=new ArrayBuffer(44+ts*4),v=new DataView(buf);
-  function ws(o,s){for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
-  ws(0,'RIFF');v.setUint32(4,36+ts*4,true);ws(8,'WAVE');ws(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,2,true);v.setUint32(24,sr,true);v.setUint32(28,sr*4,true);v.setUint16(32,4,true);v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,ts*4,true);
-  const i16=new Int16Array(buf,44);for(let i=0;i<out.length;i++)i16[i]=Math.max(-32768,Math.min(32767,out[i]*32767));
-  const blob=new Blob([buf],{type:'audio/wav'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pythia_export.wav';a.click();
-  alert('Exported! Duration: '+td.toFixed(2)+'s');
-}
-
-// ── VB MAKER ───────────────────────────────────────
-function setLang(lang){
-  S.vbLang=lang;
-  document.getElementById('langJP').classList.toggle('active',lang==='JP');
-  document.getElementById('langEN').classList.toggle('active',lang==='EN');
-  S.phIdx=0;S.recordings={};
-  document.getElementById('pills').innerHTML='';
-  updatePh();
-}
-
-function initVBMaker(){S.phIdx=0;S.recordings={};S.recChunks=[];document.getElementById('vbTotal').textContent=currentPhonemes().length;document.getElementById('pills').innerHTML='';document.getElementById('recBtn').disabled=false;updatePh();}
-
-function updatePh(){
-  document.getElementById('vbDone').textContent=Object.keys(S.recordings).length;
-  document.getElementById('vbTotal').textContent=currentPhonemes().length;
-  const phs=currentPhonemes();
-  if(S.phIdx>=phs.length){allDone();return;}
-  const[r,h,hint]=phs[S.phIdx];
-  document.getElementById('phRomaji').textContent=r.toUpperCase();
-  document.getElementById('phHira').textContent=h||hint||'';
-  const done=r in S.recordings;
-  document.getElementById('phHint').textContent=done?'Recorded! Preview or move on.':(hint?'Say: '+hint:'Hold the button and say this sound clearly');
-  document.getElementById('prevBtn').disabled=!done;document.getElementById('nextBtn').disabled=!done;
-  document.getElementById('saveVbBtn').disabled=Object.keys(S.recordings).length===0;
-}
-
-function allDone(){document.getElementById('phRomaji').textContent='Done!';document.getElementById('phHira').textContent='All phonemes recorded';document.getElementById('phHint').textContent='Tap Save Voicebank below';document.getElementById('recBtn').disabled=true;document.getElementById('saveVbBtn').disabled=false;}
-
-async function startRec(e){
-  e.preventDefault();if(S.recording)return;
-  try{
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
-    S.recChunks=[];S.mediaRecorder=new MediaRecorder(stream);
-    S.mediaRecorder.ondataavailable=ev=>{if(ev.data.size>0)S.recChunks.push(ev.data);};
-    S.mediaRecorder.start();S.recording=true;
-    const b=document.getElementById('recBtn');b.textContent='Recording... Release to stop';b.classList.add('recording');
-  }catch(err){alert('Microphone error: '+err.message);}
-}
-function stopRec(e){
-  e.preventDefault();if(!S.recording||!S.mediaRecorder)return;
-  S.mediaRecorder.stop();S.mediaRecorder.stream.getTracks().forEach(t=>t.stop());
-  S.recording=false;const b=document.getElementById('recBtn');b.textContent='Hold to Record';b.classList.remove('recording');
-  const rom=currentPhonemes()[S.phIdx][0];
-  S.mediaRecorder.onstop=()=>{S.recordings[rom]=new Blob(S.recChunks,{type:'audio/webm'});updatePh();};
-}
-async function previewRec(){const rom=currentPhonemes()[S.phIdx][0],blob=S.recordings[rom];if(!blob)return;new Audio(URL.createObjectURL(blob)).play();}
-function nextPh(){const rom=currentPhonemes()[S.phIdx][0];if(!(rom in S.recordings))return;const pill=document.createElement('div');pill.className='pill';pill.textContent=rom;document.getElementById('pills').appendChild(pill);S.phIdx++;updatePh();}
-function skipPh(){S.phIdx++;updatePh();}
-
-function abToWav(buf){
-  const sr=buf.sampleRate,len=buf.length,nc=Math.min(buf.numberOfChannels,2),out=new ArrayBuffer(44+len*nc*2),v=new DataView(out);
-  function ws(o,s){for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
-  ws(0,'RIFF');v.setUint32(4,36+len*nc*2,true);ws(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,nc,true);v.setUint32(24,sr,true);v.setUint32(28,sr*nc*2,true);v.setUint16(32,nc*2,true);v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,len*nc*2,true);
-  const i16=new Int16Array(out,44),c0=buf.getChannelData(0),c1=nc>1?buf.getChannelData(1):c0;
-  for(let i=0;i<len;i++){i16[i*nc]=Math.max(-32768,Math.min(32767,c0[i]*32767));if(nc>1)i16[i*nc+1]=Math.max(-32768,Math.min(32767,c1[i]*32767));}
-  return out;
-}
-
-async function saveVoicebank(){
-  const name=document.getElementById('vbNameInput').value.trim()||'My Voicebank',samples={},ac=getAC();
-  for(const[rom,blob] of Object.entries(S.recordings)){
-    try{const ab=await blob.arrayBuffer(),decoded=await ac.decodeAudioData(ab),wav=abToWav(decoded),fname=rom+'.wav';await new Promise(r=>setTimeout(r,150));const wb=new Blob([wav],{type:'audio/wav'}),a=document.createElement('a');a.href=URL.createObjectURL(wb);a.download=fname;a.click();samples[rom]=fname;}catch(e){console.warn(rom,e);}
-  }
-  await new Promise(r=>setTimeout(r,300));
-  const pyai={name,language:S.vbLang,base_path:'./',samples};
-  const pb=new Blob([JSON.stringify(pyai,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(pb);a.download=name+'.PYAI';a.click();
-  alert('Voicebank saved!\n\n'+Object.keys(samples).length+' phonemes downloaded.\n\nPut all .wav files and the .PYAI in the same folder, then load it in the main app.');
-  showScreen('mainScreen');
-}
-</script>
-</body>
-</html>
+// ── VOICEBANK LOADING ─────────────────────
