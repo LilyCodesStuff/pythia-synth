@@ -344,30 +344,35 @@ document.getElementById('projFile').addEventListener('change',async e=>{
 
 // ── AUDIO ──────────────────────────────────────────
 function getAC(){if(!S.audioCtx)S.audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(S.audioCtx.state==='suspended')S.audioCtx.resume();return S.audioCtx;}
-async function playSample(key,rate=1){
-  if(!S.vb||!S.vb.samples)return;const fn=S.vb.samples[key];if(!fn)return;const buf=S.audioFiles[fn];if(!buf)return;
-  try{const ac=getAC(),ab=await ac.decodeAudioData(buf.slice(0)),src=ac.createBufferSource();src.buffer=ab;src.playbackRate.value=rate;src.connect(ac.destination);src.start(0);}
-  catch(e){console.warn(e);}
-}
 
-function getPhonemes(lyric){
-  if(!S.vb)return[lyric];
-  const lang=(S.vb.language||'JP').toUpperCase();
-  const lo=lyric.toLowerCase().trim();
-  if(lang==='EN'){
-    const phs=g2p(lo);
-    // check which ones we actually have samples for
-    return phs.filter(p=>S.vb.samples&&S.vb.samples[p]).length>0
-      ? phs.filter(p=>S.vb.samples&&S.vb.samples[p])
-      : S.vb.samples&&S.vb.samples[lo]?[lo]:phs;
-  }
-  return S.vb.samples&&S.vb.samples[lo]?[lo]:[lo];
-}
+// Phase vocoder time stretch — stretches audio to targetDuration without pitch change
+// pitchRate shifts pitch independently (for note pitch)
+function phaseVocode(inputBuffer, stretchFactor, ac) {
+  const FFT_SIZE = 2048;
+  const HOP_A = 512; // analysis hop
+  const HOP_S = Math.round(HOP_A * stretchFactor); // synthesis hop
+  const sr = inputBuffer.sampleRate;
+  const numCh = inputBuffer.numberOfChannels;
 
-// ── PLAYBACK ───────────────────────────────────────
-function playSeq(){
-  if(!S.vb){alert('Please load a voicebank first!');return;}
-  if(S.playTimer)clearTimeout(S.playTimer);
-  S.playNotes=[...S.notes].sort((a,b)=>a.x-b.x);
-  if(!S.playNotes.length){alert('No notes to play!');return;}
-  S.playIdx=0;S.showHe
+  // Get input samples
+  const inLen = inputBuffer.length;
+  const channels = [];
+  for(let c=0;c<numCh;c++) channels.push(inputBuffer.getChannelData(c));
+
+  // Output length
+  const outLen = Math.round(inLen * stretchFactor);
+  const outBuf = ac.createBuffer(numCh, outLen, sr);
+
+  for(let c=0;c<numCh;c++){
+    const input = channels[c];
+    const output = new Float32Array(outLen);
+    const lastPhase = new Float32Array(FFT_SIZE);
+    const sumPhase = new Float32Array(FFT_SIZE);
+    const window = new Float32Array(FFT_SIZE);
+
+    // Hann window
+    for(let i=0;i<FFT_SIZE;i++) window[i]=0.5*(1-Math.cos(2*Math.PI*i/FFT_SIZE));
+
+    const numFrames = Math.floor((inLen - FFT_SIZE) / HOP_A);
+
+    for(let frame=0;frame<numFra
